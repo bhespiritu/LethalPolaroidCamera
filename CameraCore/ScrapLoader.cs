@@ -23,7 +23,7 @@ namespace BHCamera
         
         public void load()
         {
-            string cameraBundlePath = Path.Combine(Paths.PluginPath, CameraPlugin.CONFIG["AUTHOR"] + "PolaroidCamera", CameraPlugin.CONFIG["PLUGIN_ID"] + "/" + CameraPlugin.CONFIG["CAMERA_BUNDLE_PATH"]);
+            string cameraBundlePath = Path.Combine(Paths.PluginPath, CameraPlugin.CONFIG["AUTHOR"] + "-PolaroidCamera", CameraPlugin.CONFIG["PLUGIN_ID"] + "/" + CameraPlugin.CONFIG["CAMERA_BUNDLE_PATH"]);
             var bundle = BundleLoader.LoadAssetBundle(cameraBundlePath);
             
             var cameraPrefab = bundle.GetAsset<GameObject>("Assets/Camera/Assets/ViewFinder.prefab");
@@ -89,7 +89,7 @@ namespace BHCamera
             
             var photoPrefab = bundle.GetAsset<GameObject>("Assets/Camera/Assets/Photo.prefab");
             var photoIconTexture = bundle.GetAsset<Texture2D>("Assets/Camera/Assets/photo.png");
-            var photoSprite = Sprite.Create(cameraIconTexture, new Rect(0.0f, 0.0f, photoIconTexture.width, photoIconTexture.height), new Vector2(0.5f, 0.5f), 100f);
+            var photoSprite = Sprite.Create(photoIconTexture, new Rect(0.0f, 0.0f, photoIconTexture.width, photoIconTexture.height), new Vector2(0.5f, 0.5f), 100f);
             {
                 var item = ScriptableObject.CreateInstance<Item>();
                 item.name = "Photo";

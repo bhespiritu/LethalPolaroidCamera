@@ -77,13 +77,14 @@ namespace BHCamera
         public override void ItemActivate(bool used, bool buttonDown = true)
         {
             base.ItemActivate(used, buttonDown);
-            this.playerHeldBy.activatingItem = true;
+            //this.playerHeldBy.activatingItem = true;
             if (buttonDown && this.insertedBattery.charge > 0)
             {
                 dropFlash = true;
                 StartCoroutine(flashLight());
                 StartCoroutine(doNextFrame(this.TakePicture));
             }
+            //this.playerHeldBy.activatingItem = false;
         }
 
         public override void Update()
@@ -118,19 +119,13 @@ namespace BHCamera
             
             TakePicture_ServerRpc(imageData);
         }
-
-        private float redundantTimeCheck= 0;
         
         [ServerRpc(RequireOwnership = false)]
         private void TakePicture_ServerRpc(byte[] imageData)
         {
             if (!IsHost) return;
 
-            if ((Time.time - redundantTimeCheck) < useCooldown)
-            {
-                redundantTimeCheck = Time.time;
-                return;
-            }
+
 
             int id = CameraImageRegistry.GetInstance().RegisterImage(imageData);
             CameraImageRegistry.GetInstance().SaveImage(id);
@@ -140,7 +135,7 @@ namespace BHCamera
             
             var pos = this.transform.position + Vector3.up * 0.25f;
             
-            Transform parent = (!((Object) this.playerHeldBy != (Object) null) || !this.playerHeldBy.isInElevator) && !StartOfRound.Instance.inShipPhase || !((Object) RoundManager.Instance.spawnedScrapContainer != (Object) null) ? StartOfRound.Instance.elevatorTransform : RoundManager.Instance.spawnedScrapContainer;
+            Transform parent = (!((Object) this.playerHeldBy != (Object) null) || !this.playerHeldBy.isInElevator) && !StartOfRound.Instance.inShipPhase || !((Object) RoundManager.Instance.spawnedScrapContainer != (Object) null) ? StartOfRound.Instance.elevatorTransform : StartOfRound.Instance.elevatorTransform;
             GameObject photo = Instantiate(ScrapLoader.loadedItems["photo"].spawnPrefab, pos, Quaternion.identity, parent);
             PhotoItem photoItem = photo.GetComponent<PhotoItem>();
             photoItem.hasHitGround = false;

@@ -14,9 +14,9 @@ namespace BHCamera
 
         private bool _developingPhoto = false;
 
-        private float _developed = 1;
+        private float _developed = 0;
         
-        public float developmentSpeed = 0;
+        public float developmentSpeed = 1f/5;
         
         private readonly Dictionary<ulong, ClientRpcParams> _idCache = new();
         private Material _filmMaterial;
@@ -27,6 +27,7 @@ namespace BHCamera
         public override void Start()
         {
             base.Start();
+            developmentSpeed = 1f / 5;
             if (IsServer)
             {
                 _imageSettings = CameraPlugin.CameraConfig.ServerImageSettings;
