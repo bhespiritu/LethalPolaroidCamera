@@ -38,7 +38,7 @@ namespace BHCamera
                 item.isScrap = false;
                 item.minValue = 20;
                 item.maxValue = 80;
-                item.creditsWorth = 50;
+                item.creditsWorth = CameraPlugin.CameraConfig.cameraPrice;
                 item.weight = (float)((double)5 / 100.0 + 1.0);
                 item.spawnPrefab = cameraPrefab;
                 item.twoHanded = false;

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
-using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -58,8 +57,20 @@ namespace BHCamera
         {
             string saveFileName = GameNetworkManager.Instance.currentSaveFileName;
 
-            byte[] value = ES3.LoadRawBytes("photos/" + saveFileName +
-                                                "/Photo_" + id + ".raw");
+            var imageResolution = CameraPlugin.CameraConfig.ServerImageSettings.ImageResolution;
+            byte[] value = new byte[imageResolution *
+                                    imageResolution];
+            var photoFilePath = "photos/" + saveFileName +
+                           "/Photo_" + id + ".raw";
+            try {
+                value = ES3.LoadRawBytes(photoFilePath);
+            }
+            catch (Exception e)
+            {
+                var failedToLoadPhotos = "Failed to load " + photoFilePath;
+                CameraPlugin.Log.LogError(failedToLoadPhotos);
+                CameraPlugin.Log.LogError(e);
+            }
 
 
 

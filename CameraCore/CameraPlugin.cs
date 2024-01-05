@@ -141,9 +141,13 @@ public class CameraPluginConfig
     private ConfigEntry<int> _configPhotoResolution;
 
     private ConfigEntry<string> _configRateLimit;
+    
+    private ConfigEntry<int> _configCameraPrice;
 
     public readonly ImageSettings ServerImageSettings = new ImageSettings();
     public readonly ImageSettings ClientImageSettings = new ImageSettings();
+
+    public int cameraPrice;
     
 
     public float RateLimit
@@ -182,7 +186,9 @@ public class CameraPluginConfig
         _configPhotoResolution = instance.Config.Bind<int>("Image Settings", "ImageResolution", 64, "The resolution of the images taken by a camera. Changing this will break all existing images");
 
         _configRateLimit = instance.Config.Bind<string>("Network Settings", "RateLimit", "", "WIP. Unused. use b (bytes), kb (kilobytes), or mb (megabytes). Leaving it blank will leave the rate limit unbounded");
-        
+
+        _configCameraPrice = instance.Config.Bind<int>("General Settings", "CameraPrice", 50,
+            "The price that shows up on the store");
         
         {
             if (!Enum.TryParse<TextureFormat>(NormalizeConfigValue(_configImageFormat.Value), out var format))
@@ -194,6 +200,8 @@ public class CameraPluginConfig
             ServerImageSettings.ImageFormat = format;
         }
         ServerImageSettings.ImageResolution = _configPhotoResolution.Value;
+
+        cameraPrice = _configCameraPrice.Value;
     }
 
     private static string NormalizeConfigValue(string value)
