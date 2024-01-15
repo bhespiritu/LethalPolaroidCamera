@@ -18,7 +18,7 @@ namespace BHCamera
         private Light flashBulb;
         
         private static readonly int MainTexture = Shader.PropertyToID("MainTex");
-        private static CameraPluginConfig.ImageSettings _imageSettings = CameraPlugin.CameraConfig.ServerImageSettings;
+        private static CameraPluginConfig.ImageSettings _imageSettings = CameraPlugin.CameraConfig.imageSettings;
 
         private float flashTimeout = 1;
 
@@ -34,6 +34,11 @@ namespace BHCamera
 
         private void Awake()
         {
+            if (IsServer)
+            {
+                //CameraImageRegistry.GetInstance().LoadImagesFromSave();
+            }
+            
             var photoResolution = _imageSettings.ImageResolution;
             _cameraViewTexture = new RenderTexture(photoResolution, photoResolution, 24);
             _cameraViewTexture.filterMode = FilterMode.Point;
@@ -49,7 +54,6 @@ namespace BHCamera
         {
             base.GrabItem();
             this.previousPlayerHeldBy = this.playerHeldBy;
-            //ChangeOwnershipOfProp(NetworkManager.Singleton.LocalClientId);
         }
 
         public override void Start()

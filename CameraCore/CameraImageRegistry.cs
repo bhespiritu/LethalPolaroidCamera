@@ -41,11 +41,21 @@ namespace BHCamera
             
             foreach (var filename in photos)
             {
-                //TODO not very robust
                 int key = int.Parse(Regex.Replace(filename, "[^0-9]", ""));
                 maxId = Math.Max(maxId, key);
-
-                byte[] value = ES3.LoadImage("photos/" + filename).GetRawTextureData();
+                var imageResolution = CameraPlugin.CameraConfig.imageSettings.ImageResolution;
+                byte[] value = new byte[imageResolution *
+                                        imageResolution];
+                try
+                {
+                    value = ES3.LoadImage("photos/" + filename).GetRawTextureData();
+                }
+                catch (Exception e)
+                {
+                    var failedToLoadPhotos = "Failed to load " + filename;
+                    CameraPlugin.Log.LogError(failedToLoadPhotos);
+                    CameraPlugin.Log.LogError(e);
+                }
 
                 _imageRegistry[key] = value;
             }
@@ -57,7 +67,7 @@ namespace BHCamera
         {
             string saveFileName = GameNetworkManager.Instance.currentSaveFileName;
 
-            var imageResolution = CameraPlugin.CameraConfig.ServerImageSettings.ImageResolution;
+            var imageResolution = CameraPlugin.CameraConfig.imageSettings.ImageResolution;
             byte[] value = new byte[imageResolution *
                                     imageResolution];
             var photoFilePath = "photos/" + saveFileName +
@@ -80,16 +90,10 @@ namespace BHCamera
 
         public void SaveImages()
         {
-            
-            var resolution = CameraPlugin.CameraConfig.ServerImageSettings.ImageResolution;
-            Texture2D tex = new Texture2D(resolution, resolution,
-                CameraPlugin.CameraConfig.ServerImageSettings.ImageFormat, false);
             foreach (var entry in _imageRegistry)
             {
                 ES3.SaveRaw(entry.Value,"photos/" + GameNetworkManager.Instance.currentSaveFileName + "/Photo_"+entry.Key + ".raw");
             }
-
-            Object.Destroy(tex);
         }
 
         public void SaveImage(int id)

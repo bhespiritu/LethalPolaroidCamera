@@ -2,22 +2,24 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using BHCamera;
 using BHCamera.Patches;
+using GameNetcodeStuff;
 using HarmonyLib;
+using LethalLib.Modules;
+using Unity.Collections;
+using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEngine;
-using UnityEngine.Events;
-using UnityEngine.SceneManagement;
 
 namespace BHCamera
 {
     [BepInPlugin("itbeblockhead.lethalcompany.cameraitem", "Camera Item", "1.0.0")]
-    [BepInDependency("LC_API", BepInDependency.DependencyFlags.HardDependency)]
+    [BepInDependency("LC_API")]
+    [BepInDependency("evaisa.lethallib")]
     public class CameraPlugin : BaseUnityPlugin
     {
         private static readonly Harmony Harmony = new Harmony(nameof (CameraPlugin));
@@ -33,10 +35,6 @@ namespace BHCamera
         public static ScrapLoader ScrapLoader;
 
         public static ManualLogSource Log;
-        public static bool sessionWaiting=false;
-        public static bool alreadypatched=false;
-        public static bool isPatching = false;
-        public static bool ishost=false;
 
         public static CameraPluginConfig CameraConfig = new CameraPluginConfig();
         
@@ -56,7 +54,7 @@ namespace BHCamera
                 }
             }
             
-            CameraPlugin.Log = this.Logger;
+            Log = Logger;
             CameraConfig.SetUp(this);
             
             ScrapLoader = new ScrapLoader();
@@ -77,86 +75,60 @@ namespace BHCamera
                 networkTransform.SyncScaleZ = false;
                 networkTransform.UseHalfFloatPrecision = true;
             }
+            
+            itemAsset = ScrapLoader.loadedItems["photo"];
+            
+            if(itemAsset.spawnPrefab.GetComponent<NetworkTransform>() == null)
+            {
+                var networkTransform = itemAsset.spawnPrefab.AddComponent<NetworkTransform>();
+                networkTransform.SlerpPosition = false;
+                networkTransform.Interpolate = false;
+                networkTransform.SyncPositionX = false;
+                networkTransform.SyncPositionY = false;
+                networkTransform.SyncPositionZ = false;
+                networkTransform.SyncScaleX = false;
+                networkTransform.SyncScaleY = false;
+                networkTransform.SyncScaleZ = false;
+                networkTransform.UseHalfFloatPrecision = true;
+            }
 
-            Harmony.PatchAll(typeof(MenuManager_Patch));
+            Items.RegisterShopItem(ScrapLoader.loadedItems["camera"], CameraConfig.cameraPrice);
+            Items.RegisterItem(ScrapLoader.loadedItems["photo"]);
+                
             Harmony.PatchAll(typeof (GameNetworkManager_Patch));
-            SceneManager.sceneLoaded += new UnityAction<Scene, LoadSceneMode>(this.OnSceneLoaded);
-        }
-
-        private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
-        {
-            Log.LogInfo("Loading Scene " + scene.name );
-            if (scene.name == "MainMenu")
-            {
-                sessionWaiting = true;
-                alreadypatched = false;
-            }
-            if (scene.name == "SampleSceneRelay")
-            {
-                if(!isPatching && !WaitForSession().GetAwaiter().IsCompleted)
-                {
-                    WaitForSession().Start();
-                }
-                GameObject debugObj = GameObject.Find("DebugGUI");
-                if (!debugObj)
-                {
-                    debugObj = Instantiate(new GameObject("DebugGUI"));
-                    debugObj.AddComponent<DebugGUI>();
-                    DontDestroyOnLoad(debugObj);
-                }
-                
-            }
-        }
-        
-        private async Task WaitForSession()
-        {
-            isPatching = true;
-            try
-            {
-                while (sessionWaiting)
-                    await Task.Delay(1000);
-
-                if (alreadypatched)
-                    return;
-                Terminal_Patch.MainPatch(GameObject.Find("TerminalScript").GetComponent<Terminal>());
-                CameraImageRegistry.GetInstance().LoadImagesFromSave();
-                
-                alreadypatched = true;
-            }
-            catch (Exception e)
-            {
-                Log.LogError(e);
-            }
-            finally
-            {
-                isPatching = false;
-            }
+            Harmony.PatchAll(typeof (CameraPluginConfig));
         }
     }
 }
 
-public class CameraPluginConfig
+public class CameraPluginConfig : SyncedInstance<CameraPluginConfig>
 {
-    private ConfigEntry<string> _configImageFormat;
-    private ConfigEntry<int> _configPhotoResolution;
+    private static ConfigEntry<string> _configImageFormat;
+    private static ConfigEntry<int> _configPhotoResolution;
 
-    private ConfigEntry<string> _configRateLimit;
+    private static ConfigEntry<string> _configRateLimit;
     
-    private ConfigEntry<int> _configCameraPrice;
+    private static ConfigEntry<int> _configCameraPrice;
 
-    public readonly ImageSettings ServerImageSettings = new ImageSettings();
-    public readonly ImageSettings ClientImageSettings = new ImageSettings();
+    public ImageSettings imageSettings;
 
-    public int cameraPrice;
-    
+    public int cameraPrice => 50;
+
+
+    private string rateLimit;
+
+    public CameraPluginConfig()
+    {
+        InitInstance(this);
+    }
 
     public float RateLimit
     {
         get
         {
-            String rawValue = NormalizeConfigValue(_configRateLimit.Value);
-            String rawNumVal = Regex.Replace(rawValue, "[^0-9]*", "");
-            String suffix = Regex.Replace(rawValue, "[0-9]*", "").ToLower();
+            String rawValue = NormalizeConfigValue(rateLimit);
+            String rawNumVal = Regex.Replace(rawValue, "[0-9]*", "");
+            String suffix = Regex.Replace(rawValue, "[^0-9]*", "").ToLower();
 
             int numVal = int.Parse(rawNumVal);
             
@@ -182,12 +154,12 @@ public class CameraPluginConfig
 
     public void SetUp(CameraPlugin instance)
     {
-        _configImageFormat = instance.Config.Bind<string>("Image Settings", "ImageFormat", "RGB24", "Use Unity's built-in TextureFormat for potential values. This will have heavy effects on the performance");
-        _configPhotoResolution = instance.Config.Bind<int>("Image Settings", "ImageResolution", 64, "The resolution of the images taken by a camera. Changing this will break all existing images");
+        _configImageFormat = instance.Config.Bind("Image Settings", "ImageFormat", "RGB24", "Use Unity's built-in TextureFormat for potential values. This will have heavy effects on the performance");
+        _configPhotoResolution = instance.Config.Bind("Image Settings", "ImageResolution", 64, "The resolution of the images taken by a camera. Changing this will break all existing images");
 
-        _configRateLimit = instance.Config.Bind<string>("Network Settings", "RateLimit", "", "WIP. Unused. use b (bytes), kb (kilobytes), or mb (megabytes). Leaving it blank will leave the rate limit unbounded");
+        _configRateLimit = instance.Config.Bind("Network Settings", "RateLimit", "", "WIP. Unused. use b (bytes), kb (kilobytes), or mb (megabytes). Leaving it blank will leave the rate limit unbounded");
 
-        _configCameraPrice = instance.Config.Bind<int>("General Settings", "CameraPrice", 50,
+        _configCameraPrice = instance.Config.Bind("General Settings", "CameraPrice", 50,
             "The price that shows up on the store");
         
         {
@@ -197,21 +169,92 @@ public class CameraPluginConfig
                 format = TextureFormat.R8;
             }
 
-            ServerImageSettings.ImageFormat = format;
+            //imageSettings.ImageFormat = format;
         }
-        ServerImageSettings.ImageResolution = _configPhotoResolution.Value;
+        //imageSettings.ImageResolution = _configPhotoResolution.Value;
 
-        cameraPrice = _configCameraPrice.Value;
+        //cameraPrice = _configCameraPrice.Value;
+
+        rateLimit = _configRateLimit.Value;
     }
 
     private static string NormalizeConfigValue(string value)
     {
         return value.Trim();
     }
+    
+    public static void RequestSync() {
+        if (!IsClient) return;
+    
+        using FastBufferWriter stream = new(IntSize, Allocator.Temp);
+        MessageManager.SendNamedMessage("PolaroidCamera_OnRequestConfigSync", 0uL, stream);
+    }
+    
+    public static void OnRequestSync(ulong clientId, FastBufferReader _) {
+        if (!IsHost) return;
+    
+        CameraPlugin.Log.LogInfo($"Config sync request received from client: {clientId}");
+    
+        byte[] array = SerializeToBytes(Instance);
+        int value = array.Length;
+    
+        using FastBufferWriter stream = new(value + IntSize, Allocator.Temp);
+    
+        try {
+            stream.WriteValueSafe(in value);
+            stream.WriteBytesSafe(array);
+    
+            MessageManager.SendNamedMessage("PolaroidCamera_OnReceiveConfigSync", clientId, stream);
+        } catch(Exception e) {
+            CameraPlugin.Log.LogInfo($"Error occurred syncing config with client: {clientId}\n{e}");
+        }
+    }
+    
+    public static void OnReceiveSync(ulong _, FastBufferReader reader) {
+        if (!reader.TryBeginRead(IntSize)) {
+            CameraPlugin.Log.LogError("Config sync error: Could not begin reading buffer.");
+            return;
+        }
+    
+        reader.ReadValueSafe(out int val);
+        if (!reader.TryBeginRead(val)) {
+            CameraPlugin.Log.LogError("Config sync error: Host could not sync.");
+            return;
+        }
+    
+        byte[] data = new byte[val];
+        reader.ReadBytesSafe(ref data, val);
+    
+        SyncInstance(data);
+    
+        CameraPlugin.Log.LogInfo("Successfully synced config with host.");
+    }
+    
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(PlayerControllerB), "ConnectClientToPlayerObject")]
+    public static void InitializeLocalPlayer() {
+        if (IsHost) {
+            MessageManager.RegisterNamedMessageHandler("PolaroidCamera_OnRequestConfigSync", OnRequestSync);
+            Synced = true;
+    
+            return;
+        }
+    
+        Synced = false;
+        MessageManager.RegisterNamedMessageHandler("PolaroidCamera_OnReceiveConfigSync", OnReceiveSync);
+        RequestSync();
+    }
+    
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(GameNetworkManager), "StartDisconnect")]
+    public static void PlayerLeave() {
+        RevertSync();
+        CameraImageRegistry.GetInstance().Reset();
+    }
 
-    public class ImageSettings
+    public struct ImageSettings
     {
-        public TextureFormat ImageFormat;
-        public int ImageResolution;
+        public TextureFormat ImageFormat => TextureFormat.RGB24;
+        public int ImageResolution => 256;
     }
 }

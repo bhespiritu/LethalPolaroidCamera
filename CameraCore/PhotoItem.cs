@@ -22,7 +22,7 @@ namespace BHCamera
         private Material _filmMaterial;
         private static readonly int DevelopProgress = Shader.PropertyToID("_developProgress");
 
-        private static CameraPluginConfig.ImageSettings _imageSettings = CameraPlugin.CameraConfig.ServerImageSettings;
+        private static CameraPluginConfig.ImageSettings _imageSettings = CameraPlugin.CameraConfig.imageSettings;
         
         public override void Start()
         {
@@ -30,7 +30,7 @@ namespace BHCamera
             developmentSpeed = 1f / 5;
             if (IsServer)
             {
-                _imageSettings = CameraPlugin.CameraConfig.ServerImageSettings;
+                _imageSettings = CameraPlugin.CameraConfig.imageSettings;
             }
             else
             {
@@ -74,13 +74,21 @@ namespace BHCamera
         {
             byte[] imageData = CameraImageRegistry.GetInstance()[photoID.Value];
 
-            var photoResolution = _imageSettings.ImageResolution;
-            Texture2D tex = new Texture2D(photoResolution, photoResolution, _imageSettings.ImageFormat, false);
-            tex.filterMode = FilterMode.Point;
-            tex.LoadRawTextureData(imageData);
-            tex.Apply();
-            
-            _filmMaterial.mainTexture = tex;
+            try
+            {
+                var photoResolution = _imageSettings.ImageResolution;
+                Texture2D tex = new Texture2D(photoResolution, photoResolution, _imageSettings.ImageFormat, false);
+                tex.filterMode = FilterMode.Point;
+                tex.LoadRawTextureData(imageData);
+                tex.Apply();
+
+                _filmMaterial.mainTexture = tex;
+            }
+            catch (Exception e)
+            {
+                CameraPlugin.Log.LogError("Failed to load image onto photo item");
+                CameraPlugin.Log.LogError(e);
+            }
             _photoDeveloped = true;
         }
 
